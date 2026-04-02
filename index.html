@@ -1,0 +1,2009 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GrocerySplit — Bill Tracker</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+      import {
+        getDatabase,
+        ref,
+        set,
+        get,
+        push,
+        update,
+        remove,
+        onValue,
+        off,
+      } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
+
+      // 🔧 PASTE YOUR FIREBASE CONFIG HERE (replace every "YOUR_..." value)
+      const firebaseConfig = {
+        apiKey: "AIzaSyBh45PqEK71tC5gUDw5YvKYeEh4JvCI2zM",
+        authDomain: "grocery-split-ac78c.firebaseapp.com",
+        databaseURL: "https://grocery-split-ac78c-default-rtdb.firebaseio.com",
+        projectId: "grocery-split-ac78c",
+        storageBucket: "grocery-split-ac78c.firebasestorage.app",
+        messagingSenderId: "604074320463",
+        appId: "1:604074320463:web:d0b11da868394ba290003a",
+        measurementId: "G-998725W3BJ",
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const db = getDatabase(app);
+      window._fb = { db, ref, set, get, push, update, remove, onValue, off };
+      window._fbReady = true;
+      document.dispatchEvent(new Event("fb-ready"));
+    </script>
+
+    <style>
+      :root {
+        --bg: #f5f2ec;
+        --surface: #fff;
+        --surface2: #f0ede6;
+        --border: #e2ddd4;
+        --text: #1a1a18;
+        --text-muted: #7a7669;
+        --accent: #2d6a4f;
+        --accent-light: #e8f5ee;
+        --user1: #2d6a4f;
+        --user1-light: #e8f5ee;
+        --user2: #c05621;
+        --user2-light: #fff4eb;
+        --danger: #c0392b;
+        --danger-light: #fdf0ef;
+        --shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+        --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.1);
+        --radius: 14px;
+        --radius-sm: 8px;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "DM Sans", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        font-size: 15px;
+      }
+
+      /* LOADING */
+      #loading-screen {
+        position: fixed;
+        inset: 0;
+        background: var(--bg);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        gap: 14px;
+      }
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--border);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .loading-text {
+        font-size: 14px;
+        color: var(--text-muted);
+      }
+
+      /* CONFIG WARNING */
+      #config-warning {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: var(--bg);
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        z-index: 9998;
+      }
+      .config-box {
+        background: var(--surface);
+        border-radius: var(--radius);
+        padding: 36px;
+        max-width: 540px;
+        width: 100%;
+        box-shadow: var(--shadow-lg);
+        text-align: center;
+      }
+      .config-box h2 {
+        font-family: "DM Serif Display", serif;
+        font-size: 24px;
+        margin-bottom: 12px;
+      }
+      .config-box p {
+        color: var(--text-muted);
+        font-size: 14px;
+        line-height: 1.7;
+        margin-bottom: 10px;
+      }
+      .config-box code {
+        display: block;
+        background: var(--surface2);
+        border-radius: 8px;
+        padding: 14px 16px;
+        font-size: 12px;
+        margin: 14px 0;
+        text-align: left;
+        border: 1px solid var(--border);
+        line-height: 2;
+        word-break: break-all;
+      }
+
+      /* LOGIN */
+      #login-screen {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: var(--bg);
+        position: relative;
+        overflow: hidden;
+      }
+      #login-screen::before {
+        content: "";
+        position: absolute;
+        width: 400px;
+        height: 400px;
+        background: radial-gradient(circle, #c8e6d4 0%, transparent 70%);
+        top: -100px;
+        left: -100px;
+        pointer-events: none;
+      }
+      #login-screen::after {
+        content: "";
+        position: absolute;
+        width: 300px;
+        height: 300px;
+        background: radial-gradient(circle, #fde8d2 0%, transparent 70%);
+        bottom: -80px;
+        right: -80px;
+        pointer-events: none;
+      }
+      .login-box {
+        background: var(--surface);
+        border-radius: 24px;
+        padding: 48px 40px;
+        width: 100%;
+        max-width: 420px;
+        box-shadow: var(--shadow-lg);
+        position: relative;
+        z-index: 1;
+        animation: fadeUp 0.5s ease;
+      }
+      .login-logo {
+        text-align: center;
+        margin-bottom: 32px;
+      }
+      .login-logo .icon {
+        font-size: 40px;
+        display: block;
+        margin-bottom: 10px;
+      }
+      .login-logo h1 {
+        font-family: "DM Serif Display", serif;
+        font-size: 28px;
+      }
+      .login-logo p {
+        color: var(--text-muted);
+        font-size: 14px;
+        margin-top: 4px;
+      }
+      .user-cards {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 28px;
+      }
+      .user-card {
+        border: 2px solid var(--border);
+        border-radius: var(--radius);
+        padding: 16px;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+      }
+      .user-card:hover {
+        border-color: var(--accent);
+        background: var(--accent-light);
+      }
+      .user-card.selected-u1 {
+        border-color: var(--user1);
+        background: var(--user1-light);
+      }
+      .user-card.selected-u2 {
+        border-color: var(--user2);
+        background: var(--user2-light);
+      }
+      .user-card .avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        margin: 0 auto 8px;
+      }
+      .user-card.u1 .avatar {
+        background: var(--user1-light);
+      }
+      .user-card.u2 .avatar {
+        background: var(--user2-light);
+      }
+      .user-card strong {
+        display: block;
+        font-weight: 600;
+        font-size: 14px;
+      }
+      .user-card span {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+      .form-group {
+        margin-bottom: 18px;
+      }
+      label {
+        display: block;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-muted);
+        margin-bottom: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      input[type="text"],
+      input[type="password"],
+      input[type="number"],
+      input[type="date"],
+      textarea {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: var(--bg);
+        font-family: "DM Sans", sans-serif;
+        font-size: 15px;
+        color: var(--text);
+        transition: border-color 0.2s;
+        outline: none;
+      }
+      input:focus,
+      textarea:focus {
+        border-color: var(--accent);
+        background: #fff;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 22px;
+        border: none;
+        border-radius: var(--radius-sm);
+        font-family: "DM Sans", sans-serif;
+        font-size: 15px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+        width: 100%;
+        justify-content: center;
+      }
+      .btn-primary:hover {
+        background: #1e4d38;
+        transform: translateY(-1px);
+      }
+      .btn-primary:disabled {
+        background: #aaa;
+        cursor: not-allowed;
+        transform: none;
+      }
+      .btn-sm {
+        padding: 7px 14px;
+        font-size: 13px;
+        border-radius: 6px;
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--text-muted);
+        border: 1.5px solid var(--border);
+      }
+      .btn-ghost:hover {
+        background: var(--surface2);
+        color: var(--text);
+      }
+      .btn-danger {
+        background: var(--danger-light);
+        color: var(--danger);
+      }
+      .btn-danger:hover {
+        background: var(--danger);
+        color: #fff;
+      }
+      .btn-edit {
+        background: var(--surface2);
+        color: var(--text);
+      }
+      .btn-edit:hover {
+        background: var(--border);
+      }
+      .error-msg {
+        background: var(--danger-light);
+        color: var(--danger);
+        padding: 10px 14px;
+        border-radius: var(--radius-sm);
+        font-size: 13px;
+        margin-bottom: 16px;
+        display: none;
+      }
+
+      /* APP */
+      #app {
+        display: none;
+        min-height: 100vh;
+      }
+      .header {
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        padding: 0 24px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 64px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+      .header-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .header-brand span {
+        font-size: 22px;
+      }
+      .header-brand strong {
+        font-family: "DM Serif Display", serif;
+        font-size: 20px;
+      }
+      .header-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .user-badge {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .user-badge.u1 {
+        background: var(--user1-light);
+        color: var(--user1);
+      }
+      .user-badge.u2 {
+        background: var(--user2-light);
+        color: var(--user2);
+      }
+      .online-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #22c55e;
+        display: inline-block;
+        box-shadow: 0 0 0 2px #dcfce7;
+      }
+      .offline-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #f59e0b;
+        display: inline-block;
+      }
+      .btn-logout {
+        padding: 7px 14px;
+        font-size: 13px;
+        background: var(--surface2);
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        color: var(--text-muted);
+        font-family: "DM Sans", sans-serif;
+        transition: all 0.2s;
+      }
+      .btn-logout:hover {
+        background: var(--border);
+        color: var(--text);
+      }
+      .nav-tabs {
+        display: flex;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+        padding: 0 24px;
+      }
+      .nav-tab {
+        padding: 14px 20px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-muted);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .nav-tab:hover {
+        color: var(--text);
+      }
+      .nav-tab.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+      }
+      .main {
+        padding: 28px 24px;
+        max-width: 900px;
+        margin: 0 auto;
+      }
+      .month-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .month-nav {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .month-nav button {
+        width: 34px;
+        height: 34px;
+        border: 1.5px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+        cursor: pointer;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+      }
+      .month-nav button:hover {
+        border-color: var(--accent);
+        background: var(--accent-light);
+      }
+      .month-label {
+        font-family: "DM Serif Display", serif;
+        font-size: 22px;
+      }
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        margin-bottom: 28px;
+      }
+      .summary-card {
+        background: var(--surface);
+        border-radius: var(--radius);
+        padding: 20px;
+        box-shadow: var(--shadow);
+      }
+      .summary-card .label {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--text-muted);
+        font-weight: 500;
+        margin-bottom: 8px;
+      }
+      .summary-card .amount {
+        font-family: "DM Serif Display", serif;
+        font-size: 28px;
+      }
+      .summary-card .sub {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 4px;
+      }
+      .summary-card.total .amount {
+        color: var(--accent);
+      }
+      .split-banner {
+        background: linear-gradient(135deg, #1e4d38 0%, #2d6a4f 100%);
+        border-radius: var(--radius);
+        padding: 22px 24px;
+        color: #fff;
+        margin-bottom: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 14px;
+      }
+      .split-banner h3 {
+        font-family: "DM Serif Display", serif;
+        font-size: 20px;
+        margin-bottom: 4px;
+      }
+      .split-banner p {
+        font-size: 14px;
+        opacity: 0.85;
+      }
+      .split-amount {
+        font-family: "DM Serif Display", serif;
+        font-size: 36px;
+        white-space: nowrap;
+      }
+      .add-card {
+        background: var(--surface);
+        border-radius: var(--radius);
+        padding: 24px;
+        margin-bottom: 28px;
+        box-shadow: var(--shadow);
+      }
+      .add-card h3 {
+        font-weight: 600;
+        margin-bottom: 18px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 16px;
+      }
+      .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+      .section-header h3 {
+        font-weight: 600;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .entries-tabs {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 14px;
+      }
+      .filter-tab {
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 1.5px solid var(--border);
+        background: var(--surface);
+        color: var(--text-muted);
+      }
+      .filter-tab:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .filter-tab.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+      .entry-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .entry-item {
+        background: var(--surface);
+        border-radius: var(--radius);
+        padding: 16px 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        box-shadow: var(--shadow);
+        animation: fadeUp 0.3s ease;
+        transition: box-shadow 0.2s;
+      }
+      .entry-item:hover {
+        box-shadow: var(--shadow-lg);
+      }
+      .entry-user-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .dot-u1 {
+        background: var(--user1);
+      }
+      .dot-u2 {
+        background: var(--user2);
+      }
+      .entry-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .entry-store {
+        font-weight: 600;
+        font-size: 15px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .entry-meta {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 2px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .entry-note {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 4px;
+        font-style: italic;
+      }
+      .entry-amount {
+        font-family: "DM Serif Display", serif;
+        font-size: 20px;
+        flex-shrink: 0;
+      }
+      .entry-actions {
+        display: flex;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+      .entry-tag {
+        font-size: 11px;
+        font-weight: 500;
+        padding: 2px 8px;
+        border-radius: 10px;
+        flex-shrink: 0;
+      }
+      .tag-u1 {
+        background: var(--user1-light);
+        color: var(--user1);
+      }
+      .tag-u2 {
+        background: var(--user2-light);
+        color: var(--user2);
+      }
+      .empty-state {
+        text-align: center;
+        padding: 48px 20px;
+        color: var(--text-muted);
+      }
+      .empty-state .icon {
+        font-size: 40px;
+        margin-bottom: 12px;
+      }
+      .empty-state p {
+        font-size: 15px;
+      }
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(4px);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        animation: fadeIn 0.2s ease;
+      }
+      .modal {
+        background: var(--surface);
+        border-radius: var(--radius);
+        padding: 28px;
+        width: 100%;
+        max-width: 440px;
+        box-shadow: var(--shadow-lg);
+        animation: fadeUp 0.3s ease;
+      }
+      .modal h3 {
+        font-weight: 600;
+        font-size: 17px;
+        margin-bottom: 20px;
+      }
+      .modal-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+        margin-top: 20px;
+      }
+      .split-detail {
+        background: var(--surface);
+        border-radius: var(--radius);
+        padding: 28px;
+        box-shadow: var(--shadow);
+        margin-bottom: 20px;
+      }
+      .split-detail h3 {
+        font-family: "DM Serif Display", serif;
+        font-size: 22px;
+        margin-bottom: 20px;
+      }
+      .split-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .split-row:last-child {
+        border-bottom: none;
+      }
+      .split-row .user {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .split-row .avatar-sm {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+      }
+      .verdict-box {
+        border-radius: var(--radius);
+        padding: 22px;
+        text-align: center;
+        margin-top: 20px;
+      }
+      .verdict-box.even {
+        background: var(--accent-light);
+      }
+      .verdict-box.owes {
+        background: var(--user2-light);
+      }
+      .verdict-box .verdict-text {
+        font-family: "DM Serif Display", serif;
+        font-size: 20px;
+        margin-bottom: 4px;
+      }
+      .verdict-box .verdict-sub {
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+      .verdict-box .verdict-amt {
+        font-family: "DM Serif Display", serif;
+        font-size: 36px;
+        color: var(--user2);
+        margin: 8px 0;
+      }
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        background: var(--text);
+        color: #fff;
+        padding: 12px 20px;
+        border-radius: 10px;
+        font-size: 14px;
+        z-index: 9999;
+        animation: toastIn 0.3s ease;
+        box-shadow: var(--shadow-lg);
+      }
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(16px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      @keyframes toastIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      @media (max-width: 600px) {
+        .header {
+          padding: 0 16px;
+          height: 56px;
+        }
+        .header-brand strong {
+          display: none;
+        }
+        .nav-tabs {
+          padding: 0 12px;
+          overflow-x: auto;
+        }
+        .nav-tab {
+          padding: 12px 14px;
+          font-size: 13px;
+          white-space: nowrap;
+        }
+        .main {
+          padding: 18px 14px;
+        }
+        .summary-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+        .summary-grid .summary-card:last-child {
+          grid-column: span 2;
+        }
+        .form-row {
+          grid-template-columns: 1fr;
+        }
+        .split-banner {
+          flex-direction: column;
+          gap: 8px;
+        }
+        .entry-actions .btn-sm span {
+          display: none;
+        }
+        .login-box {
+          padding: 28px 20px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- LOADING -->
+    <div id="loading-screen">
+      <div class="spinner"></div>
+      <div class="loading-text">Connecting to database…</div>
+    </div>
+
+    <!-- CONFIG WARNING -->
+    <div id="config-warning">
+      <div class="config-box">
+        <h2>⚙️ Firebase Setup Required</h2>
+        <p>
+          Open <strong>grocery-split.html</strong> in a text editor and replace
+          the placeholder values near the top of the file inside the
+          <code>&lt;script type="module"&gt;</code> block:
+        </p>
+        <code>
+          apiKey: "YOUR_API_KEY"<br />
+          authDomain: "YOUR_PROJECT_ID.firebaseapp.com"<br />
+          databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com"<br />
+          projectId: "YOUR_PROJECT_ID"<br />
+          storageBucket: "YOUR_PROJECT_ID.appspot.com"<br />
+          messagingSenderId: "YOUR_SENDER_ID"<br />
+          appId: "YOUR_APP_ID"
+        </code>
+        <p>
+          📄 Read the included <strong>SETUP-GUIDE.txt</strong> for full
+          step-by-step instructions — it takes about 5 minutes.
+        </p>
+      </div>
+    </div>
+
+    <!-- LOGIN -->
+    <div id="login-screen" style="display: none">
+      <div class="login-box">
+        <div class="login-logo">
+          <span class="icon">🛒</span>
+          <h1>GrocerySplit</h1>
+          <p>Track bills. Split fair.</p>
+        </div>
+        <div class="user-cards">
+          <div class="user-card u1" id="card-u1" onclick="selectUser('u1')">
+            <div class="avatar">🧑</div>
+            <strong id="name-u1-display">Ibrahim</strong>
+            <span>User 1</span>
+          </div>
+          <div class="user-card u2" id="card-u2" onclick="selectUser('u2')">
+            <div class="avatar">🧑‍🦱</div>
+            <strong id="name-u2-display">Aman</strong>
+            <span>User 2</span>
+          </div>
+        </div>
+        <div class="error-msg" id="login-error"></div>
+        <div class="form-group">
+          <label>Secret Password</label>
+          <input
+            type="password"
+            id="login-password"
+            placeholder="Enter your password"
+            onkeydown="if (event.key === 'Enter') doLogin();"
+          />
+        </div>
+        <button class="btn btn-primary" id="login-btn" onclick="doLogin()">
+          🔑 Sign In
+        </button>
+      </div>
+    </div>
+
+    <!-- APP -->
+    <div id="app">
+      <div class="header">
+        <div class="header-brand">
+          <span>🛒</span><strong>GrocerySplit</strong>
+        </div>
+        <div class="header-right">
+          <span id="conn-indicator"></span>
+          <div class="user-badge" id="current-user-badge"></div>
+          <button class="btn-logout" onclick="logout()">Sign Out</button>
+        </div>
+      </div>
+      <div class="nav-tabs">
+        <div
+          class="nav-tab active"
+          onclick="showTab('dashboard')"
+          id="tab-dashboard"
+        >
+          📊 Dashboard
+        </div>
+        <div class="nav-tab" onclick="showTab('entries')" id="tab-entries">
+          📝 Entries
+        </div>
+        <div class="nav-tab" onclick="showTab('split')" id="tab-split">
+          ⚖️ Split
+        </div>
+        <div class="nav-tab" onclick="showTab('settings')" id="tab-settings">
+          ⚙️ Settings
+        </div>
+      </div>
+      <div class="main">
+        <!-- DASHBOARD -->
+        <div id="pane-dashboard">
+          <div class="month-bar">
+            <div class="month-nav">
+              <button onclick="changeMonth(-1)">‹</button>
+              <div class="month-label" id="month-label-dash"></div>
+              <button onclick="changeMonth(1)">›</button>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="goToday()">
+              Today's Month
+            </button>
+          </div>
+          <div class="summary-grid">
+            <div class="summary-card">
+              <div class="label" id="dash-u1-label">Ibrahim</div>
+              <div class="amount" id="dash-u1-total">$0.00</div>
+              <div class="sub" id="dash-u1-count">0 entries</div>
+            </div>
+            <div class="summary-card">
+              <div class="label" id="dash-u2-label">Aman</div>
+              <div class="amount" id="dash-u2-total">$0.00</div>
+              <div class="sub" id="dash-u2-count">0 entries</div>
+            </div>
+            <div class="summary-card total">
+              <div class="label">Monthly Total</div>
+              <div class="amount" id="dash-total">$0.00</div>
+              <div class="sub" id="dash-entry-count">0 entries total</div>
+            </div>
+          </div>
+          <div class="split-banner" id="split-banner">
+            <div>
+              <h3 id="split-banner-title">All square! 🎉</h3>
+              <p id="split-banner-sub">No balance owed this month</p>
+            </div>
+            <div class="split-amount" id="split-banner-amount">$0.00</div>
+          </div>
+          <div class="section-header">
+            <h3>📋 Recent Entries</h3>
+            <button class="btn btn-ghost btn-sm" onclick="showTab('entries')">
+              View All
+            </button>
+          </div>
+          <div class="entry-list" id="recent-list"></div>
+        </div>
+
+        <!-- ENTRIES -->
+        <div id="pane-entries" style="display: none">
+          <div class="month-bar">
+            <div class="month-nav">
+              <button onclick="changeMonth(-1)">‹</button>
+              <div class="month-label" id="month-label-entries"></div>
+              <button onclick="changeMonth(1)">›</button>
+            </div>
+          </div>
+          <div class="add-card">
+            <h3>➕ Add Grocery Entry</h3>
+            <div class="form-row">
+              <div class="form-group" style="margin: 0">
+                <label>Store / Place</label
+                ><input
+                  type="text"
+                  id="entry-store"
+                  placeholder="e.g. Walmart, No Frills"
+                />
+              </div>
+              <div class="form-group" style="margin: 0">
+                <label>Amount (CAD $)</label
+                ><input
+                  type="number"
+                  id="entry-amount"
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+            </div>
+            <div class="form-row" style="margin-top: 14px">
+              <div class="form-group" style="margin: 0">
+                <label>Date</label><input type="date" id="entry-date" />
+              </div>
+              <div class="form-group" style="margin: 0">
+                <label>Note (optional)</label
+                ><input
+                  type="text"
+                  id="entry-note"
+                  placeholder="e.g. weekly groceries"
+                />
+              </div>
+            </div>
+            <button
+              class="btn btn-primary"
+              style="margin-top: 18px; width: auto; padding: 12px 28px"
+              onclick="addEntry()"
+              id="add-btn"
+            >
+              Add Entry
+            </button>
+          </div>
+          <div class="section-header"><h3>🗂 All Entries</h3></div>
+          <div class="entries-tabs">
+            <div class="filter-tab active" onclick="setFilter('all', this)">
+              All
+            </div>
+            <div
+              class="filter-tab"
+              id="filter-tab-u1"
+              onclick="setFilter('u1', this)"
+            >
+              Ibrahim
+            </div>
+            <div
+              class="filter-tab"
+              id="filter-tab-u2"
+              onclick="setFilter('u2', this)"
+            >
+              Aman
+            </div>
+          </div>
+          <div class="entry-list" id="all-entries-list"></div>
+        </div>
+
+        <!-- SPLIT -->
+        <div id="pane-split" style="display: none">
+          <div class="month-bar">
+            <div class="month-nav">
+              <button onclick="changeMonth(-1)">‹</button>
+              <div class="month-label" id="month-label-split"></div>
+              <button onclick="changeMonth(1)">›</button>
+            </div>
+          </div>
+          <div class="split-detail">
+            <h3>Monthly Bill Summary</h3>
+            <div class="split-row">
+              <div class="user">
+                <div class="avatar-sm" style="background: var(--user1-light)">
+                  🧑
+                </div>
+                <div>
+                  <div
+                    style="font-weight: 600; font-size: 15px"
+                    id="split-u1-name"
+                  >
+                    Ibrahim
+                  </div>
+                  <div
+                    style="font-size: 12px; color: var(--text-muted)"
+                    id="split-u1-count"
+                  >
+                    0 entries
+                  </div>
+                </div>
+              </div>
+              <div
+                style="
+                  font-family: &quot;DM Serif Display&quot;, serif;
+                  font-size: 22px;
+                  color: var(--user1);
+                "
+                id="split-u1-amt"
+              >
+                $0.00
+              </div>
+            </div>
+            <div class="split-row">
+              <div class="user">
+                <div class="avatar-sm" style="background: var(--user2-light)">
+                  🧑‍🦱
+                </div>
+                <div>
+                  <div
+                    style="font-weight: 600; font-size: 15px"
+                    id="split-u2-name"
+                  >
+                    Aman
+                  </div>
+                  <div
+                    style="font-size: 12px; color: var(--text-muted)"
+                    id="split-u2-count"
+                  >
+                    0 entries
+                  </div>
+                </div>
+              </div>
+              <div
+                style="
+                  font-family: &quot;DM Serif Display&quot;, serif;
+                  font-size: 22px;
+                  color: var(--user2);
+                "
+                id="split-u2-amt"
+              >
+                $0.00
+              </div>
+            </div>
+            <div class="split-row">
+              <div style="font-weight: 600; color: var(--text-muted)">
+                Total
+              </div>
+              <div
+                style="
+                  font-family: &quot;DM Serif Display&quot;, serif;
+                  font-size: 22px;
+                "
+                id="split-total-amt"
+              >
+                $0.00
+              </div>
+            </div>
+            <div class="split-row">
+              <div style="font-weight: 600; color: var(--text-muted)">
+                Each should pay (50%)
+              </div>
+              <div
+                style="
+                  font-family: &quot;DM Serif Display&quot;, serif;
+                  font-size: 22px;
+                  color: var(--accent);
+                "
+                id="split-each-amt"
+              >
+                $0.00
+              </div>
+            </div>
+            <div class="verdict-box" id="verdict-box">
+              <div class="verdict-text" id="verdict-text">No entries yet</div>
+              <div
+                class="verdict-amt"
+                id="verdict-amt"
+                style="display: none"
+              ></div>
+              <div class="verdict-sub" id="verdict-sub">
+                Add some grocery bills first
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SETTINGS -->
+        <div id="pane-settings" style="display: none">
+          <div class="split-detail">
+            <h3>⚙️ Settings</h3>
+            <p
+              style="
+                color: var(--text-muted);
+                font-size: 14px;
+                margin-bottom: 24px;
+              "
+            >
+              Changes sync instantly to both devices.
+            </p>
+            <div style="display: grid; gap: 28px">
+              <div>
+                <div style="font-weight: 600; margin-bottom: 14px">
+                  <span
+                    style="
+                      background: var(--user1-light);
+                      color: var(--user1);
+                      padding: 3px 10px;
+                      border-radius: 10px;
+                      font-size: 13px;
+                    "
+                    >User 1</span
+                  >
+                </div>
+                <div class="form-row">
+                  <div class="form-group" style="margin: 0">
+                    <label>Display Name</label
+                    ><input
+                      type="text"
+                      id="set-name-u1"
+                      placeholder="Ibrahim"
+                    />
+                  </div>
+                  <div class="form-group" style="margin: 0">
+                    <label>New Password</label
+                    ><input
+                      type="password"
+                      id="set-pass-u1"
+                      placeholder="Leave blank to keep current"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div style="font-weight: 600; margin-bottom: 14px">
+                  <span
+                    style="
+                      background: var(--user2-light);
+                      color: var(--user2);
+                      padding: 3px 10px;
+                      border-radius: 10px;
+                      font-size: 13px;
+                    "
+                    >User 2</span
+                  >
+                </div>
+                <div class="form-row">
+                  <div class="form-group" style="margin: 0">
+                    <label>Display Name</label
+                    ><input type="text" id="set-name-u2" placeholder="Aman" />
+                  </div>
+                  <div class="form-group" style="margin: 0">
+                    <label>New Password</label
+                    ><input
+                      type="password"
+                      id="set-pass-u2"
+                      placeholder="Leave blank to keep current"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <button
+                  class="btn btn-primary"
+                  style="width: auto; padding: 12px 28px"
+                  onclick="saveSettings()"
+                >
+                  💾 Save Settings
+                </button>
+              </div>
+              <div
+                style="border-top: 1px solid var(--border); padding-top: 20px"
+              >
+                <div
+                  style="
+                    font-weight: 600;
+                    margin-bottom: 10px;
+                    color: var(--danger);
+                  "
+                >
+                  ⚠️ Danger Zone
+                </div>
+                <p
+                  style="
+                    font-size: 13px;
+                    color: var(--text-muted);
+                    margin-bottom: 14px;
+                  "
+                >
+                  Delete all entries for the currently viewed month. Cannot be
+                  undone.
+                </p>
+                <button class="btn btn-danger btn-sm" onclick="clearMonth()">
+                  🗑 Clear This Month's Data
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EDIT MODAL -->
+    <div
+      class="modal-overlay"
+      id="edit-modal"
+      style="display: none"
+      onclick="if (event.target === this) closeModal();"
+    >
+      <div class="modal">
+        <h3>✏️ Edit Entry</h3>
+        <input type="hidden" id="edit-id" />
+        <div class="form-group">
+          <label>Store / Place</label><input type="text" id="edit-store" />
+        </div>
+        <div class="form-group">
+          <label>Amount (CAD $)</label
+          ><input type="number" id="edit-amount" min="0" step="0.01" />
+        </div>
+        <div class="form-group">
+          <label>Date</label><input type="date" id="edit-date" />
+        </div>
+        <div class="form-group">
+          <label>Note</label
+          ><input type="text" id="edit-note" placeholder="Optional" />
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost btn-sm" onclick="closeModal()">
+            Cancel
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="saveEdit()">
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- DELETE MODAL -->
+    <div
+      class="modal-overlay"
+      id="delete-modal"
+      style="display: none"
+      onclick="if (event.target === this) closeDeleteModal();"
+    >
+      <div class="modal">
+        <h3>🗑 Delete Entry?</h3>
+        <p
+          style="color: var(--text-muted); font-size: 14px; margin-bottom: 20px"
+        >
+          This will permanently remove this entry from the shared database.
+        </p>
+        <input type="hidden" id="delete-id" />
+        <div class="modal-actions">
+          <button class="btn btn-ghost btn-sm" onclick="closeDeleteModal()">
+            Cancel
+          </button>
+          <button class="btn btn-danger btn-sm" onclick="confirmDelete()">
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ── Wait for Firebase ──
+      document.addEventListener("fb-ready", onFirebaseReady);
+      const cfgTimeout = setTimeout(() => {
+        if (!window._fbReady) {
+          document.getElementById("loading-screen").style.display = "none";
+          document.getElementById("config-warning").style.display = "flex";
+        }
+      }, 6000);
+
+      function onFirebaseReady() {
+        clearTimeout(cfgTimeout);
+        const { db, ref, onValue } = window._fb;
+        onValue(
+          ref(db, "settings"),
+          (snap) => {
+            if (!snap.val()) seedDefaults().then(bootstrapLogin);
+            else bootstrapLogin();
+          },
+          (err) => {
+            document.getElementById("loading-screen").style.display = "none";
+            document.getElementById("config-warning").style.display = "flex";
+          },
+          { onlyOnce: true },
+        );
+      }
+
+      async function seedDefaults() {
+        await fbSet("settings", {
+          u1: { name: "Ibrahim", pass: "ibrahim7998" },
+          u2: { name: "Aman", pass: "aman2003" },
+        });
+      }
+
+      function bootstrapLogin() {
+        document.getElementById("loading-screen").style.display = "none";
+        document.getElementById("login-screen").style.display = "flex";
+        fbGet("settings").then((s) => {
+          if (!s) return;
+          document.getElementById("name-u1-display").textContent = s.u1.name;
+          document.getElementById("name-u2-display").textContent = s.u2.name;
+        });
+      }
+
+      // ── Firebase helpers ──
+      function fbDB() {
+        return window._fb.db;
+      }
+      function fbRef(p) {
+        return window._fb.ref(fbDB(), p);
+      }
+      async function fbGet(p) {
+        return (await window._fb.get(fbRef(p))).val();
+      }
+      async function fbSet(p, v) {
+        await window._fb.set(fbRef(p), v);
+      }
+      async function fbPush(p, v) {
+        return (await window._fb.push(fbRef(p), v)).key;
+      }
+      async function fbUpdate(p, v) {
+        await window._fb.update(fbRef(p), v);
+      }
+      async function fbRemove(p) {
+        await window._fb.remove(fbRef(p));
+      }
+      function fbListen(p, cb) {
+        const r = fbRef(p);
+        window._fb.onValue(r, (s) => cb(s.val()));
+        return () => window._fb.off(r);
+      }
+
+      // ── State ──
+      let currentUser = null,
+        selectedLogin = null,
+        currentFilter = "all";
+      let viewMonth = new Date().getMonth(),
+        viewYear = new Date().getFullYear();
+      let liveEntries = {},
+        liveSettings = {};
+      let entriesUnsub = null,
+        settingsUnsub = null;
+
+      // ── Login ──
+      function selectUser(uid) {
+        selectedLogin = uid;
+        document.getElementById("card-u1").className =
+          "user-card u1" + (uid === "u1" ? " selected-u1" : "");
+        document.getElementById("card-u2").className =
+          "user-card u2" + (uid === "u2" ? " selected-u2" : "");
+        document.getElementById("login-password").focus();
+      }
+
+      async function doLogin() {
+        const errEl = document.getElementById("login-error");
+        errEl.style.display = "none";
+        if (!selectedLogin) {
+          showErr("Please choose a user first.");
+          return;
+        }
+        const pass = document.getElementById("login-password").value;
+        const btn = document.getElementById("login-btn");
+        btn.disabled = true;
+        btn.textContent = "Signing in…";
+        try {
+          const settings = await fbGet("settings");
+          if (!settings) {
+            showErr("Database not reachable. Check your Firebase config.");
+            return;
+          }
+          if (pass === settings[selectedLogin].pass) {
+            currentUser = selectedLogin;
+            document.getElementById("login-screen").style.display = "none";
+            document.getElementById("app").style.display = "block";
+            initApp(settings);
+          } else {
+            showErr("Incorrect password. Try again.");
+          }
+        } catch (e) {
+          showErr("Connection error: " + e.message);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "🔑 Sign In";
+        }
+      }
+
+      function showErr(msg) {
+        const el = document.getElementById("login-error");
+        el.textContent = msg;
+        el.style.display = "block";
+      }
+
+      function logout() {
+        if (entriesUnsub) {
+          entriesUnsub();
+          entriesUnsub = null;
+        }
+        if (settingsUnsub) {
+          settingsUnsub();
+          settingsUnsub = null;
+        }
+        currentUser = null;
+        selectedLogin = null;
+        liveEntries = {};
+        liveSettings = {};
+        document.getElementById("app").style.display = "none";
+        document.getElementById("login-screen").style.display = "flex";
+        document.getElementById("login-password").value = "";
+        document.getElementById("card-u1").className = "user-card u1";
+        document.getElementById("card-u2").className = "user-card u2";
+        document.getElementById("login-error").style.display = "none";
+      }
+
+      // ── Init ──
+      function initApp(settings) {
+        liveSettings = settings;
+        viewMonth = new Date().getMonth();
+        viewYear = new Date().getFullYear();
+        document.getElementById("entry-date").value = new Date()
+          .toISOString()
+          .split("T")[0];
+        updateUINames();
+
+        // Connection dot
+        window._fb.onValue(
+          window._fb.ref(fbDB(), ".info/connected"),
+          (snap) => {
+            document.getElementById("conn-indicator").innerHTML = snap.val()
+              ? '<span class="online-dot" title="Live — connected"></span>'
+              : '<span class="offline-dot" title="Offline"></span>';
+          },
+        );
+
+        // Live listeners
+        entriesUnsub = fbListen("entries", (v) => {
+          liveEntries = v || {};
+          renderAll();
+        });
+        settingsUnsub = fbListen("settings", (v) => {
+          if (!v) return;
+          liveSettings = v;
+          updateUINames();
+          renderAll();
+        });
+
+        showTab("dashboard");
+      }
+
+      function getName(uid) {
+        return liveSettings[uid]?.name || (uid === "u1" ? "Ibrahim" : "Aman");
+      }
+
+      function updateUINames() {
+        const n1 = getName("u1"),
+          n2 = getName("u2");
+        ["name-u1-display", "filter-tab-u1", "split-u1-name"].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = n1;
+        });
+        ["name-u2-display", "filter-tab-u2", "split-u2-name"].forEach((id) => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = n2;
+        });
+        const badge = document.getElementById("current-user-badge");
+        if (currentUser) {
+          badge.textContent =
+            (currentUser === "u1" ? "🧑 " : "🧑‍🦱 ") + getName(currentUser);
+          badge.className = "user-badge " + currentUser;
+        }
+        const sn1 = document.getElementById("set-name-u1"),
+          sn2 = document.getElementById("set-name-u2");
+        if (sn1 && !sn1.matches(":focus")) sn1.value = n1;
+        if (sn2 && !sn2.matches(":focus")) sn2.value = n2;
+      }
+
+      // ── Tabs / Month ──
+      function showTab(tab) {
+        ["dashboard", "entries", "split", "settings"].forEach((t) => {
+          document.getElementById("pane-" + t).style.display =
+            t === tab ? "block" : "none";
+          document.getElementById("tab-" + t).className =
+            "nav-tab" + (t === tab ? " active" : "");
+        });
+        renderAll();
+      }
+
+      function changeMonth(d) {
+        viewMonth += d;
+        if (viewMonth > 11) {
+          viewMonth = 0;
+          viewYear++;
+        }
+        if (viewMonth < 0) {
+          viewMonth = 11;
+          viewYear--;
+        }
+        renderAll();
+      }
+      function goToday() {
+        viewMonth = new Date().getMonth();
+        viewYear = new Date().getFullYear();
+        renderAll();
+      }
+      function monthLabel() {
+        return new Date(viewYear, viewMonth, 1).toLocaleDateString("en-CA", {
+          month: "long",
+          year: "numeric",
+        });
+      }
+
+      // ── Data helpers ──
+      function getMonthEntries() {
+        return Object.entries(liveEntries)
+          .map(([id, e]) => ({ ...e, id }))
+          .filter((e) => {
+            const d = new Date(e.date + "T00:00:00");
+            return d.getMonth() === viewMonth && d.getFullYear() === viewYear;
+          })
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      }
+      function calcTotals(entries) {
+        const u1 = entries.filter((e) => e.user === "u1"),
+          u2 = entries.filter((e) => e.user === "u2");
+        return {
+          u1: {
+            entries: u1,
+            total: u1.reduce((s, e) => s + Number(e.amount), 0),
+          },
+          u2: {
+            entries: u2,
+            total: u2.reduce((s, e) => s + Number(e.amount), 0),
+          },
+          grand: entries.reduce((s, e) => s + Number(e.amount), 0),
+        };
+      }
+      function fmt(n) {
+        return "$" + Number(n).toFixed(2);
+      }
+      function esc(s) {
+        return String(s)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+
+      // ── Render ──
+      function renderAll() {
+        ["dash", "entries", "split"].forEach((k) => {
+          const el = document.getElementById("month-label-" + k);
+          if (el) el.textContent = monthLabel();
+        });
+        renderDashboard();
+        renderEntries();
+        renderSplit();
+      }
+
+      function renderDashboard() {
+        const entries = getMonthEntries(),
+          c = calcTotals(entries);
+        document.getElementById("dash-u1-label").textContent = getName("u1");
+        document.getElementById("dash-u2-label").textContent = getName("u2");
+        document.getElementById("dash-u1-total").textContent = fmt(c.u1.total);
+        document.getElementById("dash-u2-total").textContent = fmt(c.u2.total);
+        document.getElementById("dash-u1-count").textContent =
+          c.u1.entries.length + " entries";
+        document.getElementById("dash-u2-count").textContent =
+          c.u2.entries.length + " entries";
+        document.getElementById("dash-total").textContent = fmt(c.grand);
+        document.getElementById("dash-entry-count").textContent =
+          entries.length + " entries total";
+        const each = c.grand / 2,
+          diff = c.u1.total - each;
+        const banner = document.getElementById("split-banner");
+        const title = document.getElementById("split-banner-title"),
+          sub = document.getElementById("split-banner-sub"),
+          amt = document.getElementById("split-banner-amount");
+        if (Math.abs(diff) < 0.01) {
+          title.textContent = "All square! 🎉";
+          sub.textContent = "Both paid equally";
+          amt.textContent = "$0.00";
+          banner.style.background =
+            "linear-gradient(135deg,#1e4d38 0%,#2d6a4f 100%)";
+        } else if (diff > 0) {
+          title.textContent = getName("u2") + " owes " + getName("u1");
+          sub.textContent = getName("u1") + " has paid more this month";
+          amt.textContent = fmt(Math.abs(diff));
+          banner.style.background =
+            "linear-gradient(135deg,#7b3a10 0%,#c05621 100%)";
+        } else {
+          title.textContent = getName("u1") + " owes " + getName("u2");
+          sub.textContent = getName("u2") + " has paid more this month";
+          amt.textContent = fmt(Math.abs(diff));
+          banner.style.background =
+            "linear-gradient(135deg,#7b3a10 0%,#c05621 100%)";
+        }
+        document.getElementById("recent-list").innerHTML =
+          entries
+            .slice(0, 5)
+            .map((e) => entryHTML(e, false))
+            .join("") || emptyHTML("No entries yet for this month");
+      }
+
+      function renderEntries() {
+        const entries = getMonthEntries();
+        const filtered =
+          currentFilter === "all"
+            ? entries
+            : entries.filter((e) => e.user === currentFilter);
+        document.getElementById("all-entries-list").innerHTML =
+          filtered.map((e) => entryHTML(e, true)).join("") ||
+          emptyHTML("No entries found");
+      }
+
+      function renderSplit() {
+        const entries = getMonthEntries(),
+          c = calcTotals(entries);
+        document.getElementById("split-u1-name").textContent = getName("u1");
+        document.getElementById("split-u2-name").textContent = getName("u2");
+        document.getElementById("split-u1-count").textContent =
+          c.u1.entries.length + " entries";
+        document.getElementById("split-u2-count").textContent =
+          c.u2.entries.length + " entries";
+        document.getElementById("split-u1-amt").textContent = fmt(c.u1.total);
+        document.getElementById("split-u2-amt").textContent = fmt(c.u2.total);
+        document.getElementById("split-total-amt").textContent = fmt(c.grand);
+        const each = c.grand / 2;
+        document.getElementById("split-each-amt").textContent = fmt(each);
+        const diff = c.u1.total - each;
+        const vbox = document.getElementById("verdict-box"),
+          vtxt = document.getElementById("verdict-text"),
+          vamt = document.getElementById("verdict-amt"),
+          vsub = document.getElementById("verdict-sub");
+        if (c.grand === 0) {
+          vbox.className = "verdict-box even";
+          vtxt.textContent = "No entries yet";
+          vamt.style.display = "none";
+          vsub.textContent = "Add some grocery bills first";
+        } else if (Math.abs(diff) < 0.01) {
+          vbox.className = "verdict-box even";
+          vtxt.textContent = "🎉 All settled!";
+          vamt.style.display = "none";
+          vsub.textContent = "Both have paid equally this month";
+        } else if (diff > 0) {
+          vbox.className = "verdict-box owes";
+          vtxt.textContent = getName("u2") + " owes " + getName("u1");
+          vamt.style.display = "block";
+          vamt.textContent = fmt(Math.abs(diff));
+          vsub.textContent =
+            getName("u1") +
+            " paid " +
+            fmt(Math.abs(diff)) +
+            " more than their share";
+        } else {
+          vbox.className = "verdict-box owes";
+          vtxt.textContent = getName("u1") + " owes " + getName("u2");
+          vamt.style.display = "block";
+          vamt.textContent = fmt(Math.abs(diff));
+          vsub.textContent =
+            getName("u2") +
+            " paid " +
+            fmt(Math.abs(diff)) +
+            " more than their share";
+        }
+      }
+
+      function entryHTML(e, showActions) {
+        const d = new Date(e.date + "T00:00:00");
+        const dateStr = d.toLocaleDateString("en-CA", {
+          month: "short",
+          day: "numeric",
+        });
+        const canEdit = e.user === currentUser;
+        const actions =
+          showActions && canEdit
+            ? `<div class="entry-actions"><button class="btn btn-edit btn-sm" onclick="openEdit('${e.id}')"><span>Edit</span> ✏️</button><button class="btn btn-danger btn-sm" onclick="openDelete('${e.id}')"><span>Del</span> 🗑</button></div>`
+            : "";
+        return `<div class="entry-item"><div class="entry-user-dot dot-${e.user}"></div><div class="entry-info"><div class="entry-store">${esc(e.store)}</div><div class="entry-meta"><span>${dateStr}</span><span class="entry-tag tag-${e.user}">${esc(getName(e.user))}</span></div>${e.note ? `<div class="entry-note">${esc(e.note)}</div>` : ""}</div><div class="entry-amount">${fmt(e.amount)}</div>${actions}</div>`;
+      }
+      function emptyHTML(msg) {
+        return `<div class="empty-state"><div class="icon">🛒</div><p>${msg}</p></div>`;
+      }
+
+      // ── Add Entry ──
+      async function addEntry() {
+        const store = document.getElementById("entry-store").value.trim();
+        const amount = parseFloat(
+          document.getElementById("entry-amount").value,
+        );
+        const date = document.getElementById("entry-date").value;
+        const note = document.getElementById("entry-note").value.trim();
+        if (!store) {
+          showToast("Please enter a store name");
+          return;
+        }
+        if (!amount || amount <= 0) {
+          showToast("Please enter a valid amount");
+          return;
+        }
+        if (!date) {
+          showToast("Please select a date");
+          return;
+        }
+        const btn = document.getElementById("add-btn");
+        btn.disabled = true;
+        btn.textContent = "Saving…";
+        try {
+          await fbPush("entries", {
+            user: currentUser,
+            store,
+            amount,
+            date,
+            note: note || "",
+            createdAt: new Date().toISOString(),
+          });
+          document.getElementById("entry-store").value = "";
+          document.getElementById("entry-amount").value = "";
+          document.getElementById("entry-note").value = "";
+          document.getElementById("entry-date").value = new Date()
+            .toISOString()
+            .split("T")[0];
+          const d = new Date(date + "T00:00:00");
+          viewMonth = d.getMonth();
+          viewYear = d.getFullYear();
+          showToast("Entry added! 🛒");
+        } catch (e) {
+          showToast("Error: " + e.message);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Add Entry";
+        }
+      }
+
+      // ── Filter ──
+      function setFilter(f, el) {
+        currentFilter = f;
+        document
+          .querySelectorAll(".filter-tab")
+          .forEach((t) => t.classList.remove("active"));
+        el.classList.add("active");
+        renderEntries();
+      }
+
+      // ── Edit ──
+      function openEdit(id) {
+        const e = liveEntries[id];
+        if (!e || e.user !== currentUser) return;
+        document.getElementById("edit-id").value = id;
+        document.getElementById("edit-store").value = e.store;
+        document.getElementById("edit-amount").value = e.amount;
+        document.getElementById("edit-date").value = e.date;
+        document.getElementById("edit-note").value = e.note || "";
+        document.getElementById("edit-modal").style.display = "flex";
+      }
+      async function saveEdit() {
+        const id = document.getElementById("edit-id").value;
+        const store = document.getElementById("edit-store").value.trim();
+        const amount = parseFloat(document.getElementById("edit-amount").value);
+        const date = document.getElementById("edit-date").value;
+        const note = document.getElementById("edit-note").value.trim();
+        if (!store || !amount || !date) {
+          showToast("Fill all required fields");
+          return;
+        }
+        try {
+          await fbUpdate("entries/" + id, {
+            store,
+            amount,
+            date,
+            note: note || "",
+          });
+          closeModal();
+          showToast("Entry updated ✅");
+        } catch (e) {
+          showToast("Error: " + e.message);
+        }
+      }
+      function closeModal() {
+        document.getElementById("edit-modal").style.display = "none";
+      }
+
+      // ── Delete ──
+      function openDelete(id) {
+        document.getElementById("delete-id").value = id;
+        document.getElementById("delete-modal").style.display = "flex";
+      }
+      async function confirmDelete() {
+        const id = document.getElementById("delete-id").value;
+        try {
+          await fbRemove("entries/" + id);
+          closeDeleteModal();
+          showToast("Entry deleted");
+        } catch (e) {
+          showToast("Error: " + e.message);
+        }
+      }
+      function closeDeleteModal() {
+        document.getElementById("delete-modal").style.display = "none";
+      }
+
+      // ── Settings ──
+      async function saveSettings() {
+        const n1 = document.getElementById("set-name-u1").value.trim();
+        const n2 = document.getElementById("set-name-u2").value.trim();
+        const p1 = document.getElementById("set-pass-u1").value;
+        const p2 = document.getElementById("set-pass-u2").value;
+        const updates = {};
+        if (n1) updates["settings/u1/name"] = n1;
+        if (n2) updates["settings/u2/name"] = n2;
+        if (p1) updates["settings/u1/pass"] = p1;
+        if (p2) updates["settings/u2/pass"] = p2;
+        if (!Object.keys(updates).length) {
+          showToast("Nothing to save");
+          return;
+        }
+        try {
+          await window._fb.update(fbRef("/"), updates);
+          document.getElementById("set-pass-u1").value = "";
+          document.getElementById("set-pass-u2").value = "";
+          showToast("Settings saved ✅ — both devices updated instantly");
+        } catch (e) {
+          showToast("Error: " + e.message);
+        }
+      }
+
+      async function clearMonth() {
+        if (
+          !confirm(
+            "Delete ALL entries for " + monthLabel() + "? Cannot be undone.",
+          )
+        )
+          return;
+        const toDelete = getMonthEntries().map((e) => e.id);
+        if (!toDelete.length) {
+          showToast("No entries to delete");
+          return;
+        }
+        const updates = {};
+        toDelete.forEach((id) => {
+          updates["entries/" + id] = null;
+        });
+        try {
+          await window._fb.update(fbRef("/"), updates);
+          showToast("Month data cleared");
+        } catch (e) {
+          showToast("Error: " + e.message);
+        }
+      }
+
+      // ── Toast ──
+      function showToast(msg) {
+        const old = document.querySelector(".toast");
+        if (old) old.remove();
+        const el = document.createElement("div");
+        el.className = "toast";
+        el.textContent = msg;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 3000);
+      }
+    </script>
+  </body>
+</html>
